@@ -10,6 +10,7 @@ import android.widget.AdapterView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.MenuItemCompat
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
 import com.google.android.material.snackbar.Snackbar
@@ -37,6 +38,7 @@ class MainActivity  : AppCompatActivity() {
     companion object {
         const val MIN_QUERY_LENGTH = 2
     }
+    private var liveData: LiveData<Resource<List<Movie>>>? = null
     private lateinit var db: MovieDatabase
     private lateinit var viewModel: MovieViewModel
     private lateinit var gridViewAdapter: MovieAdapter
@@ -57,22 +59,24 @@ class MainActivity  : AppCompatActivity() {
 
     private fun initButtons() {
         nextTextView.setOnClickListener {
-            viewModel.getMovies(search.also {
+            search.also {
                 it.page++
                 it.timestamp = System.currentTimeMillis()
-            }).observe(this@MainActivity, observer)
+            }
+
+            submitSearch()
         }
 
         prevTextView.setOnClickListener {
             if(search.page > 1) {
-                viewModel.getMovies(search.also {
+                search.also {
                     it.page--
                     it.timestamp = System.currentTimeMillis()
-                }).observe(this@MainActivity, observer)
+                }
+
+                submitSearch()
             }
         }
-
-        pageTextView.text = "Page ${search.page} out of 1000"
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -109,12 +113,18 @@ class MainActivity  : AppCompatActivity() {
                             it.timestamp = System.currentTimeMillis()
                         }
 
-                        viewModel.getMovies(search).observeOnce(this@MainActivity, observer)
-                    }
+                        submitSearch()
+                     }
                     return true
                 }
             })
         }
+    }
+
+    private fun submitSearch() {
+        liveData?.removeObserver(observer)
+        liveData = viewModel.getMovies(search)
+        liveData?.observeOnce(this@MainActivity, observer)
     }
 
     private suspend fun initView() {
@@ -131,7 +141,8 @@ class MainActivity  : AppCompatActivity() {
         }
 
         viewModel = ViewModelProviders.of(this).get(MovieViewModel::class.java)
-        viewModel.retrieveMovies().observeOnce(this@MainActivity, observer)
+        liveData = viewModel.retrieveMovies()
+        liveData?.observeOnce(this@MainActivity, observer)
     }
 
     private val observer =
